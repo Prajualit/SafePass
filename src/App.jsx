@@ -5,6 +5,10 @@ import './App.css'
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { v4 as uuidv4 } from 'uuid';
+import CircularJSON from 'circular-json'
+var obj = { foo: 'bar' },
+  str;
+
 
 function App() {
   const ref = useRef()
@@ -12,11 +16,17 @@ function App() {
   const [form, setform] = useState({ site: "", username: "", password: "" })
   const [passwordArray, setpasswordArray] = useState([])
 
+  const getPasswords = async () => {
+    let req = await fetch("http://localhost:3000/")
+    let passwords = await req.json()
+    setpasswordArray(passwords)
+  }
+
+
+
   useEffect(() => {
-    let passwords = localStorage.getItem("passwords")
-    if (passwords) {
-      setpasswordArray(JSON.parse(passwords))
-    }
+    getPasswords();
+
   }, [])
 
   const showPassword = () => {
@@ -30,49 +40,71 @@ function App() {
     }
   }
 
-  const savePassword = () => {
-    setpasswordArray([...passwordArray, { ...form, id: uuidv4() }])
-    localStorage.setItem("passwords", JSON.stringify([...passwordArray, { ...form, id: uuidv4() }]))
-    setform({ site: "", username: "", password: "" })
-    toast('Password saved!', {
-      position: "top-right",
-      autoClose: 5000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: "dark",
-    });
+  const savePassword = async () => {
+    if (form.site.length > 3 && form.username.length > 3 && form.password.length > 3) {      
+
+      setpasswordArray([...passwordArray, { ...form, id: uuidv4() }])
+
+      
+      await fetch("http://localhost:3000/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, id: uuidv4() }) })
+
+      // Otherwise clear the form and show toast
+      setform({ site: "", username: "", password: "" })
+      toast('Password saved!', {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+    }
+    else {
+      toast('Error: Password not saved!');
+    }
   }
 
   const handleChange = (e) => {
     setform({ ...form, [e.target.name]: e.target.value })
   }
 
-  const handleDelete = (e) => {
-    let c = confirm("Do you want to delete the password?")
+
+
+  const handleDelete = async (id) => {
+    console.log("Deleting password with id ", id)
+    let c = confirm("Do you really want to delete this password?")
     if (c) {
-      let passwordArrayCopy = [...passwordArray]
-      passwordArrayCopy.splice(e.target.id, 1)
-      setpasswordArray(passwordArrayCopy)
-      localStorage.setItem("passwords", JSON.stringify(passwordArrayCopy))
+      setpasswordArray(passwordArray.filter(item => item.id !== id))
+
+      await fetch("http://localhost:3000/", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: form.id }) })
+
+
+
+      toast('Password Deleted!', {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+      // reload site
+      window.location.reload()
     }
-    toast('Password Deleted!', {
-      position: "top-right",
-      autoClose: 5000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: "dark",
-    });
+
   }
 
+
+
+
+
   const handleEdit = (id) => {
-    setform(passwordArray.filter(i => i.id === id)[0])
+    setform({ ...passwordArray.filter(i => i.id === id)[0], id: id })
     setpasswordArray(passwordArray.filter(item => item.id !== id))
+
   }
 
   const handleCopy = (text) => {
@@ -160,8 +192,8 @@ function App() {
                 <th className="bg-neutral-900 max-md:hidden md:w-full lg:rounded-r-lg mx-2 py-3">Actions</th>
               </tr>
             </thead>}
-          {passwordArray.map((item, index) => {
-            return <><tbody className="w-full" key={index}>
+          {passwordArray.map((item, id) => {
+            return <><tbody className="w-full" key={id}>
               <tr>
                 <td className="p-4 px-10 md:items-center md:justify-between justify-center font-light text-green-500 underline underline-offset-2 md:space-x-2 flex">
                   <span>
@@ -188,14 +220,14 @@ function App() {
               <div className="bg-neutral-900 w-full rounded-lg py-3 flex items-center px-2 ml-10 justify-around text-green-500 font-bold md:hidden">Actions
                 <div className='flex items-center justify-center space-x-2'>
                   <img onClick={() => handleEdit(item.id)} className='cursor-pointer hover:scale-110' src="src/assets/edit.svg" alt="" />
-                  <img onClick={handleDelete} className='cursor-pointer hover:scale-110' src="src/assets/delete.svg" alt="" />
+                  <img onClick={() => handleDelete(item.id)} className='cursor-pointer hover:scale-110' src="src/assets/delete.svg" alt="" />
                 </div>
               </div>
             </>
           })}
         </table>
       </div>
-      <div className='p-3 fixed bottom-0 w-full flex justify-around items-center max-sm:flex-col bg-[#0c0c0c]'>
+      <div className='p-3 w-full flex justify-around items-center max-sm:flex-col bg-[#0c0c0c]'>
         <div className='text-[23px] font-bold'>
           <span className='text-green-500'>&lt;</span>Safe<span className='text-green-500'>Pass/&gt;</span>
         </div>
